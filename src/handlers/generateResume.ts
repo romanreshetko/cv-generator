@@ -1,0 +1,52 @@
+import { Request, Response } from "express"
+import yaml from "js-yaml";
+import { renderToStaticMarkup } from "react-dom/server";
+import ResumePage from "../components/resumePage";
+import { ResumeData } from "../types/resumeTypes";
+import puppeteer from "puppeteer";
+import archiver from "archiver";
+
+export const generateResume = async (req: Request, res: Response) => {
+    try {
+        if (!req.file) {
+            res.status(400).json({ message: "File error" });
+            return;
+        }
+
+        const fileContent = req.file.buffer.toString("utf-8");
+        const resumeData = yaml.load(fileContent) as ResumeData;
+
+        if (!resumeData || typeof resumeData !== "object") {
+            res.status(400).json({ message: "Invalid YAML format" });
+            return;
+        }
+
+        const fullHtml = `<!DOCTYPE html>` + renderToStaticMarkup(ResumePage({resumeData}));
+
+        const browser = await puppeteer.launch();
+        const page = await browser.newPage();
+
+        await page.setContent(fullHtml, {waitUntil: 'networkidle0'});
+
+        const pdfBuffer = await page.pdf({format: 'A4'});
+        await browser.close();
+
+        res.setHeader("Content-Type", "application/zip");
+        res.setHeader("Content-Disposition", 'attachment; filename="resume.zip"');
+        //res.end(pdfBuffer);
+
+        const archive = archiver("zip", {zlib: {level: 9}});
+
+        archive.append(fullHtml, {name: "resume.html"});
+        archive.append(Buffer.from(pdfBuffer), {name: "resume.pdf"});
+
+        archive.pipe(res);
+        archive.finalize();
+      
+
+        //res.status(200).json({ message: "Resume page generated successfully", html: fullHtml });
+
+    } catch (error) {
+        res.status(500).json({ message: "Server error" });
+    }
+}
