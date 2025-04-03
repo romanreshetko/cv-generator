@@ -5,6 +5,8 @@ import ResumePage from "../components/resumePage";
 import { ResumeData } from "../types/resumeTypes";
 import puppeteer from "puppeteer";
 import archiver from "archiver";
+import fs from "fs";
+import path from "path";
 
 export const generateResume = async (req: Request, res: Response) => {
     try {
@@ -21,12 +23,24 @@ export const generateResume = async (req: Request, res: Response) => {
             return;
         }
 
-        const fullHtml = `<!DOCTYPE html>` + renderToStaticMarkup(ResumePage({resumeData}));
+        const styles = fs.readFileSync(path.join(__dirname, "../globals.css"), "utf-8");
+
+        const htmlContent = renderToStaticMarkup(ResumePage({resumeData}));
+
+        const fullHtml = `
+        <html>
+        <head>
+            <style>${styles}</style>
+        </head>
+        <body>
+            ${htmlContent}
+        </body>
+        </html>`;
 
         const browser = await puppeteer.launch();
         const page = await browser.newPage();
 
-        await page.setContent(fullHtml, {waitUntil: 'networkidle0'});
+        await page.setContent(fullHtml, {waitUntil: 'load'});
 
         const pdfBuffer = await page.pdf({format: 'A4'});
         await browser.close();
