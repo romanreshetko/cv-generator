@@ -36,8 +36,11 @@ export const generateResume = async (req: Request, res: Response) => {
             ${htmlContent}
         </body>
         </html>`;
-
-        const browser = await puppeteer.launch();
+        
+        const browser = await puppeteer.launch({
+            headless: true,
+            args: ['--no-sandbox', '--disable-setuid-sandbox']
+        });
         const page = await browser.newPage();
 
         await page.setContent(fullHtml, {waitUntil: 'load'});
@@ -61,6 +64,7 @@ export const generateResume = async (req: Request, res: Response) => {
         //res.status(200).json({ message: "Resume page generated successfully", html: fullHtml });
 
     } catch (error) {
+        console.log(error);
         res.status(500).json({ message: "Server error" });
     }
 }
